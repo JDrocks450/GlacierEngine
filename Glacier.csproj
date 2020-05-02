@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{7B8D067B-E48E-4B24-A3EB-FAE3F4715279}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Glacier.Common</RootNamespace>
+    <AssemblyName>Glacier.Common</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject />
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="MonoGame.Framework, Version=3.7.1.189, Culture=neutral, processorArchitecture=MSIL" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Engine\GameObject.cs" />
+    <Compile Include="Engine\IUser.cs" />
+    <Compile Include="Engine\IUserOwnable.cs" />
+    <Compile Include="Engine\Shadow.cs" />
+    <Compile Include="Provider\AnimatedObjectProvider.cs" />
+    <Compile Include="Provider\HeadlineProvider.cs" />
+    <Compile Include="Provider\ParticleProvider.cs" />
+    <Compile Include="Provider\UserProvider.cs" />
+    <Compile Include="Provider\ContentProvider.cs" />
+    <Compile Include="Engine\World.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Provider\CameraProvider.cs" />
+    <Compile Include="Provider\Input\IClickable.cs" />
+    <Compile Include="Provider\Input\InputProvider.cs" />
+    <Compile Include="Provider\IProvider.cs" />
+    <Compile Include="Provider\NameProvider.cs" />
+    <Compile Include="Provider\ProviderManager.cs" />
+    <Compile Include="Provider\WorldProvider.cs" />
+    <Compile Include="Util\Camera.cs" />
+    <Compile Include="Primitives\Direction.cs" />
+    <Compile Include="Util\GameResources.cs" />
+    <Compile Include="Primitives\GridCoordinate.cs" />
+    <Compile Include="Util\GlacierSpriteBatch.cs" />
+    <Compile Include="Util\GObservableCollection.cs" />
+    <Compile Include="Util\IDGenerator.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Content\names.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
