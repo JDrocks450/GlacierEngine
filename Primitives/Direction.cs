@@ -16,5 +16,5 @@ namespace Glacier.Common.Primitives
         SE = 271,
         SW = 181,
         NW = 91
-    }
+    }    
 }

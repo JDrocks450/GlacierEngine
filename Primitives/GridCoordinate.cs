@@ -28,8 +28,22 @@ namespace Glacier.Common.Primitives
             this.Column = Column;
         }
 
-        public static GridCoordinate operator +(GridCoordinate left, GridCoordinate right)
+        public static implicit operator Point(GridCoordinate coord)
         {
+            return coord.point;
+        }
+        public static implicit operator GridCoordinate(Point coord)
+        {
+            return new GridCoordinate(coord.Y, coord.X);
+        }
+        public override bool Equals(object obj)
+        {
+            if (obj is GridCoordinate coord)
+                return point == coord.point;
+            else return false;
+        }
+        public static GridCoordinate operator +(GridCoordinate left, GridCoordinate right)
+        {            
             return new GridCoordinate(left.Row + right.Row, left.Column + right.Column);
         }
         public static GridCoordinate operator -(GridCoordinate left, GridCoordinate right)

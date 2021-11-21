@@ -13,10 +13,12 @@ namespace Glacier.Common.Provider.Input
     {
         Texture2D Texture { get; }
         float Scale { get; }
-        Rectangle Hitbox { get; }
+        Rectangle Hitbox { get; set; }
+        Rectangle Safezone { get; }
         bool IsMouseOver { get; set; }
         bool PerpixelHitDetection { get; }
         bool Enabled { get; }
+        bool Destroyed { get; }
         void MouseEnter(GameTime time,InputEventArgs args);
         void Clicked(GameTime time, InputEventArgs args);
         void MouseDown(GameTime time, InputEventArgs args);

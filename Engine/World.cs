@@ -1,4 +1,5 @@
 ﻿using Glacier.Common.Primitives;
+using Glacier.Common.Provider;
 using Glacier.Common.Util;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -58,7 +59,10 @@ namespace Glacier.Common.Engine
             get;set;
         }
     }
+    public interface IWorldGenerationParams
+    {
 
+    }
     public interface ITileObject
     {
         string Title
@@ -79,6 +83,12 @@ namespace Glacier.Common.Engine
         {
             get;
         }
+        int SquareSize
+        {
+            get;
+        }
+        Vector2 OriginRatio { get; }
+
         void Update(GameTime time);
     }
     public class WorldTile
@@ -87,14 +97,14 @@ namespace Glacier.Common.Engine
         public const int TILE_WIDTH = 120, TILE_HEIGHT = 60;
         public enum TileTypes : short
         {
-            DeepOcean = -5,
-            Ocean = 0,
-            Dirt = 5,
-            Grass = 10,
-            DeepGrass = 15,
-            DarkStone = 20,
-            Stone = 25,
-            Snow = 30
+            DeepOcean,
+            Ocean,            
+            Dirt,
+            Grass,
+            DeepGrass,
+            DarkStone,
+            Stone,
+            Snow
         }
         public TileTypes TileType;
         private Texture2D _texture;
@@ -103,43 +113,50 @@ namespace Glacier.Common.Engine
         public int Row
         {
             get => GridLocation.Row;
-            set
-            {
-                GridLocation.Row = value;
-                WorldPosition = new Point((int)(Column * (.5f * TILE_WIDTH) + Row * (.5f * TILE_WIDTH)),
-                        (int)(Row * (.5f * TILE_HEIGHT) - Column * (.5f * TILE_HEIGHT)));  
-            }
+            set => GridLocation.Row = value;
+        }
+        /// <summary>
+        /// Calculates the position of this tile in the world using <see cref="World.ChunkPosition"/>, <see cref="Row"/> and <see cref="Column"/>
+        /// </summary>
+        /// <returns></returns>
+        public Point GetWorldPos()
+        {
+            var wCol = Parent.ChunkPosition.X;
+            var wRow = Parent.ChunkPosition.Y;
+            return new Point(
+                    (int)(wCol * (50 * (TILE_WIDTH / 2.0f)) + wRow * (50 * (TILE_WIDTH / 2.0f))) +
+                    (int)(Column * (.5f * TILE_WIDTH) + Row * (.5f * TILE_WIDTH)),
+                    (int)(wRow * (50 * (TILE_HEIGHT / 2.0f)) - wCol * (50 * (TILE_HEIGHT / 2.0f))) +
+                    (int)(Row * (.5f * TILE_HEIGHT) - Column * (.5f * TILE_HEIGHT)));
         }
         public int Column
-        {            
+        {
             get => GridLocation.Column;
-            set
-            {
-                GridLocation.Column = value;
-                WorldPosition = new Point((int)(Column * (.5f * TILE_WIDTH) + Row * (.5f * TILE_WIDTH)),
-                        (int)(Row * (.5f * TILE_HEIGHT) - Column * (.5f * TILE_HEIGHT)));   
-            }     
+            set => GridLocation.Column = value;
         }
         public GridCoordinate GridLocation
         {
             get; private set;
         } = new GridCoordinate(0,0);
-        public Point WorldPosition
-        {
-            get; private set;
-        }
+        /// <summary>
+        /// The world-position of this tile. See: <see cref="GetWorldPos"/>
+        /// </summary>
+        public Point WorldPosition => GetWorldPos();
         public double ZIndex
         {
             get; internal set;
         }              
+        public bool Occupied
+        {
+            get; internal set;
+        }
         public Texture2D Texture
         {
-            get
-            {
-                if (_texture == null)
-                    _texture = GameResources.GetTexture("Tiles/" + Parent.GetTileTextureName(TileType));
-                return _texture;
-            }
+            get; set;
+        }
+        public Direction FacingDirection
+        {
+            get;set;
         }
         public Color Highlight
         {
@@ -170,11 +187,17 @@ namespace Glacier.Common.Engine
         {
             if (PlacedObject != null)
                 return false;
+            if (Occupied) return false;
+            PathfindingProvider pathfindingSystem = null; // ProviderManager.Root.Get<PathfindingProvider>();
+            if (pathfindingSystem != null)            
+                pathfindingSystem.TrySetTileState(WorldPosition,
+                    PathfindingProvider.PathfindingTileSpaceState.Occupied, "GLACIER.WORLDTILE", out _);            
             PlacedObject = Object;
             Object.Position = (Center
                             - new Point(Object.Size.X / 2, Object.Size.Y / 2)).ToVector2()
                             + Object.Offset.Value; // position in direct center of tile, plus the Offset in ITileObject
             Object.Parent = this;
+            Occupied = true;            
             return true;
         }
 
@@ -182,15 +205,17 @@ namespace Glacier.Common.Engine
         {            
             PlacedObject.Parent = null;
             PlacedObject = null;
+            Occupied = false;
         }
     }
     public abstract class World : Engine.IGameComponent
     {             
-        internal const int W_SIZE = 50;
+        public const int W_SIZE = 50;
         public string Name
         {
             get;set;
         }
+        public Point ChunkPosition { get; internal set;  }
         public int SizeX
         {
             get;
@@ -202,6 +227,7 @@ namespace Glacier.Common.Engine
             internal set;
         }
         public bool IsLoaded { get; set; }
+        public double[,] PerlinNoise { get; set; }
 
         /// <summary>
         /// A cache of the WorldLocation of each tile of the map with it's GridCoordinate -- avoids unnecessary mathmatical calculations with grids at angles other than 90
@@ -219,23 +245,25 @@ namespace Glacier.Common.Engine
         {
             get; protected set;
         }
-        public HashSet<WorldTile> WorldTilesWithObjects = new HashSet<WorldTile>();
+        public bool Destroyed { get; set; }
+
         private List<Point> tileCachedLocations = new List<Point>();
 
-        protected World() : this("AntWorld", false)
-        {
-
-        }
-
-        protected World(string name, bool init) : this(name, init, W_SIZE, W_SIZE)
+        protected World(Point ChunkPosition) : this("AntWorld", ChunkPosition, false)
         {
             
         }
-        protected World(string name, bool init, int sizeX = W_SIZE, int sizeY = W_SIZE)
+
+        protected World(string name, Point ChunkPosition, bool init) : this(name, ChunkPosition, init, W_SIZE, W_SIZE)
+        {
+            
+        }
+        protected World(string name, Point ChunkPosition, bool init, int sizeX = W_SIZE, int sizeY = W_SIZE)
         {
             Name = name;
             SizeX = sizeX;
             SizeY = sizeY; 
+            this.ChunkPosition = ChunkPosition;
             if (init)
                 Initialize();
         }
@@ -271,10 +299,12 @@ namespace Glacier.Common.Engine
             foreach (var tile in tiles)
             {
                 var localPosition = GameResources.MouseWorldPosition - tile.WorldPosition;
-                if (tileCachedLocations.Contains(localPosition))
+                if (PointInsideViewableArea(localPosition))
                     return tile;
             }
-            return null;
+            if (tiles.Any())
+                return tiles[0];
+            else return null;
         } 
 
         public T PlaceObjectOnTile<T>(T Object, int Column, int Row) where T : ITileObject
@@ -287,24 +317,49 @@ namespace Glacier.Common.Engine
         {
             try
             {
-                WorldTilesWithObjects.Add(tile);
+                ProviderManager.Root.Get<GameObjectManager>().Add(Object.ThisObject);
             }
             catch (Exception) { }
             tile.PlaceObject(Object);
+            if (Object.SquareSize > 1)
+            {
+                for(int x = 0; x < ((ITileObject)Object).SquareSize; x++)
+                {
+                    for (int y = 0; y < ((ITileObject)Object).SquareSize; y++)
+                    {
+                        var multitile = GetFromGridLocation(new GridCoordinate(tile.GridLocation.Row + y,
+                                                                               tile.GridLocation.Column + x));
+                        multitile.Occupied = true;
+                    }
+                }
+            }
             return Object;
         }
         
         public T PlaceObjectOnTile<T>(T Object, GridCoordinate RowColPoint) where T : ITileObject
         {
             return PlaceObjectOnTile(Object, RowColPoint.Column, RowColPoint.Row);
-        } 
+        }
 
         public void RemoveObjectOnTile(WorldTile tile)
         {
+            var Object = tile.PlacedObject;
             tile.DeleteObject();
-            WorldTilesWithObjects.Remove(tile);
+            ProviderManager.Root.Get<GameObjectManager>().Add(Object.ThisObject);
+            if (Object.SquareSize > 1)
+            for (int x = 0; x < Object.SquareSize; x++)
+            {
+                for (int y = 0; y < Object.SquareSize; y++)
+                {
+                    var multitile = GetFromGridLocation(new GridCoordinate(tile.GridLocation.Row + y,
+                                                                           tile.GridLocation.Column + x));
+                    multitile.Occupied = false;
+                }
+            }        
         }
-        
+
+        public abstract void GenerateStructures(IWorldGenerationParams Params);
+
         public virtual void Initialize()
         {
             OrderedWorldData = new List<WorldTile>();
@@ -324,7 +379,7 @@ namespace Glacier.Common.Engine
                 }
                 row++;
                 
-            }
+            }            
             for (int x = SizeX - 2; x >= 0; x--)
             {
                 var X = x;
@@ -339,7 +394,10 @@ namespace Glacier.Common.Engine
                     X--;
                 }
                 row++;
-            }
+            }           
+            IsLoaded = true;
+            /// THIS IS LEGACY CODE FOR PER-PIXEL COLLISION ON TILES
+            /*
             var texture = GameResources.GetTexture("Tiles/blank_reg");
             var colors = new Color[texture.Width*texture.Height];
             texture.GetData(0, null, colors, 0, colors.Length);
@@ -352,16 +410,84 @@ namespace Glacier.Common.Engine
                         tileCachedLocations.Add(new Point(x, y));
                 }
             }
+            */
+        }
+        /// <summary>
+        /// Calculates whether the supplied point is within the boundaries of this tile's visible space.
+        /// <para>This is done by simply calculating if the point is within a diamond of the Tile's size - it does not take into
+        /// consideration an irregularly shaped tile. This is too performance intensive for almost no benefit.</para>
+        /// </summary>
+        /// <param name="Position"></param>
+        /// <returns></returns>
+        public Boolean PointInsideViewableArea(Point Position)
+        {
+            int x = Position.X;
+            float y = Position.Y;
+            double width = WorldTile.TILE_WIDTH;
+            double height = WorldTile.TILE_HEIGHT;
+            Point center = new Point((int)(width / 2), (int)(height / 2));
+            int dx = Math.Abs(x - center.X);
+            double dy = Math.Abs(y - center.Y);
+            double d = dx / width + dy / height;
+            return d <= 0.5;
         }
         public abstract void Update(GameTime gt);
         public WorldTile GetFromGridLocation(GridCoordinate Coordinates)
         {
-            return WorldData[Coordinates.Column, Coordinates.Row];
+            if (Coordinates.Column < 0)
+                return null;//Coordinates.Column = 0;
+            if (Coordinates.Column >= SizeX)
+                return null;//Coordinates.Column = SizeX-1;
+            if (Coordinates.Row < 0)
+                return null;// Coordinates.Row = 0;
+            if (Coordinates.Row >= SizeY)
+                return null;// Coordinates.Row = SizeY-1;                
+            try
+            {
+                return WorldData[Coordinates.Column, Coordinates.Row];
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        public IEnumerable<T> SearchFromCenter<T>(GridCoordinate Center, int SquareArea) => 
+            Search<T>(new GridCoordinate(Center.Row - (SquareArea / 2), Center.Column - (SquareArea / 2)),
+                new GridCoordinate(Center.Row + (SquareArea / 2), Center.Column + (SquareArea / 2)));
+
+        public IEnumerable<T> Search<T>(GridCoordinate From, int SquareArea)=>
+            Search<T>(From, new GridCoordinate(From.Row + SquareArea, From.Column + SquareArea));
+
+        public IEnumerable<T> Search<T>(GridCoordinate From, GridCoordinate To)
+        {
+            List<WorldTile> list = new List<WorldTile>();
+            for(int x = From.Column; x < To.Column; x++)
+            {
+                for (int y = From.Row; y < To.Row; y++)
+                {
+                    var tile = GetFromGridLocation(new GridCoordinate(y, x));
+                    if (tile == null) continue;
+                    if (tile.PlacedObject != null && tile.PlacedObject is T)
+                    {
+                        yield return (T)tile.PlacedObject;
+                    }
+                }
+            }            
         }
 
         public GridCoordinate GetRandomTileCoordinate()
         {
             return GameResources.GetRandomPoint(0, SizeX, 0, SizeY);
+        }
+
+        public void Dispose()
+        {
+            WorldLocationCache.Clear();
+            WorldData = null;
+            PerlinNoise = null;
+            OrderedWorldData.Clear();
+            OrderedWorldData = null;
         }
     }
 }

@@ -1,8 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace Glacier.Common.Provider
 {
@@ -10,6 +12,11 @@ namespace Glacier.Common.Provider
     {
         private static Dictionary<string, ProviderManager> _currentProviders = new Dictionary<string, ProviderManager>();
         private Dictionary<Type, IProvider> providers = new Dictionary<Type, IProvider>();
+        private Stopwatch _debugTimer;
+        private Dictionary<IProvider, TimeSpan> _diagnosticInfo = new Dictionary<IProvider, TimeSpan>();
+        private Queue<double> _avgTime = new Queue<double>();
+        private TimeSpan frameTime;
+
         public string KeyName
         {
             get;
@@ -27,6 +34,7 @@ namespace Glacier.Common.Provider
             _currentProviders.Add(key, this);
             KeyName = key;
             Console.WriteLine($"ProviderManager: Scope [{key}] Created");
+            _debugTimer = new Stopwatch();
         }
 
         public static ProviderManager Get(string key)
@@ -47,11 +55,23 @@ namespace Glacier.Common.Provider
             return _currentProviders.Remove(key);
         }
 
-        public T Get<T>()
+        public T Get<T>() where T : IProvider
         {
             if(providers.TryGetValue(typeof(T), out var value))
                 return (T)value;
-            return default;
+            throw new ArgumentException($"A component of this Game is requesting access to a Provider that hasn't been added yet to your Game: " +
+                $"{typeof(T).Name}. Use ProviderManager.Register to set up this provider for use in this project.");
+        }
+
+        public bool TryGet<T>(out T Provider)
+        {
+            if (providers.TryGetValue(typeof(T), out var value))
+            {
+                Provider = (T)value;
+                return true;
+            }
+            Provider = default(T);
+            return false;
         }
 
         /// <summary>
@@ -77,9 +97,38 @@ namespace Glacier.Common.Provider
         /// <param name="time"></param>
         public void Refresh(GameTime time)
         {
+            _diagnosticInfo.Clear();
+            _debugTimer.Reset();
+            _debugTimer.Start();
             foreach (var provider in providers.Values)
+            {
+                var milliseconds = _debugTimer.Elapsed;
                 if (provider != this)
                     provider.Refresh(time);
+                milliseconds = _debugTimer.Elapsed - milliseconds;
+                _diagnosticInfo.Add(provider, milliseconds);
+            }
+            _debugTimer.Stop();
+            frameTime = _debugTimer.Elapsed;
+            if (_avgTime.Count > 120)
+                _avgTime.Dequeue();
+            _avgTime.Enqueue(frameTime.TotalMilliseconds);
+        }
+
+        public override string ToString()
+        {
+            return "ProviderManager (" + KeyName + ") " + providers.Count + " providers registered";
+        }
+
+        public string GetDebugString()
+        {
+            return "=====PROVIDERS=====\n" +
+                ToString() + "\n"
+                + string.Join("\n", providers.Values.Select(
+                    x => x.GetType().Name + $" - {(_diagnosticInfo[x].TotalMilliseconds).ToString("F2")}ms" +
+                    $" ({(_diagnosticInfo[x].TotalMilliseconds / frameTime.TotalMilliseconds).ToString("P")})"))
+                + $"\nFrameTime {frameTime.TotalMilliseconds.ToString("F2")}ms\n" +
+                $"Avg. FrameRate (Unrendered) {(1000 / _avgTime.Average()).ToString("F2")} FPS";
         }
     }
 }

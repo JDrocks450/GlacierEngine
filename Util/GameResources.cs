@@ -4,6 +4,7 @@ using Glacier.Common.Provider;
 using Glacier.Common.Provider.Input;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 using System;
 using System.Diagnostics;
 
@@ -11,15 +12,27 @@ namespace Glacier.Common.Util
 {
     public static class GameResources
     {
-        public static Random Rand = new Random();
+        public static GlacierGame CurrentGame { get; internal set; }
+
+        public static Random Rand { get; private set; } = new Random();
         public static Viewport CurrentViewport => Device.Viewport;
         public static Rectangle Screen => CurrentViewport.Bounds;
         public static InputProvider InputProvider => ProviderManager.GetRoot().Get<InputProvider>();
 
-        public static GraphicsDevice Device;
+        public static GraphicsDevice Device { get; internal set; }
         public static Texture2D BaseTexture { get; private set; }
-        public static Point MouseWorldPosition => ProviderManager.Root.Get<CameraProvider>().Default.WorldMousePosition;
+        public static Point MouseWorldPosition
+        {
+            get
+            {
+                var manager = ProviderManager.Root;
+                if (manager.TryGet<CameraProvider>(out var camera))
+                    return camera.Default.WorldMousePosition;
+                else return Mouse.GetState().Position;
+            }
+        }
         public static bool Debug_GUIDebuggingActivated { get; set; } = false;
+        public static bool Debug_HighlightHitboxes { get; set; } = false;
 
         public static Stopwatch Stopwatch = new Stopwatch();
 
@@ -117,7 +130,8 @@ namespace Glacier.Common.Util
         public static void DrawMouseHighlight(SpriteBatch batch, GameObject subject, Color color)
         {
             if (subject.Texture == null) return;
-            batch.Draw(subject.Texture, subject.TextureDestination, subject.TextureSource, color * .5f);
+            batch.Draw(subject.Texture, subject.TextureDestination, subject.TextureSource, color * .5f,
+                subject.Rotation, subject.Origin, subject.SpriteFlipSetting, 0);
         }
     }
 }

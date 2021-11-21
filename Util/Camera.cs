@@ -71,6 +71,7 @@ namespace Glacier.Common.Util
             get => ScreenToWorld(Mouse.GetState().Position.ToVector2()).ToPoint();
         }
         public string Name { get; internal set; }
+        public bool Destroyed { get; set; }
 
         Point mouseDragStartPos = Point.Zero;
         bool mouseRightPressed = false, _transitioning = false;
@@ -211,6 +212,11 @@ namespace Glacier.Common.Util
         public Vector2 WorldToScreen(Vector2 Position)
         {            
             return Vector2.Transform(Position, Transformation);
+        }
+
+        public void Dispose()
+        {
+            
         }
     }
 }

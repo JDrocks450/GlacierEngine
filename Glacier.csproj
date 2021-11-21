@@ -46,12 +46,23 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Engine\GameObject.cs" />
+    <Compile Include="Engine\GlacierGame.cs" />
     <Compile Include="Engine\IUser.cs" />
     <Compile Include="Engine\IUserOwnable.cs" />
     <Compile Include="Engine\Shadow.cs" />
+    <Compile Include="Math\Noise.cs" />
+    <Compile Include="Primitives\TextureAtlas.cs" />
+    <Compile Include="Primitives\ValueRef.cs" />
     <Compile Include="Provider\AnimatedObjectProvider.cs" />
+    <Compile Include="Provider\AnimationDefinition.cs" />
+    <Compile Include="Provider\AudioProvider.cs" />
+    <Compile Include="Provider\Chromosome.cs" />
+    <Compile Include="Provider\GameObjectManager.cs" />
     <Compile Include="Provider\HeadlineProvider.cs" />
+    <Compile Include="Provider\LayoutAnimationProvider.cs" />
     <Compile Include="Provider\ParticleProvider.cs" />
+    <Compile Include="Provider\PathfindingProvider.cs" />
+    <Compile Include="Provider\ThreadingProvider.cs" />
     <Compile Include="Provider\UserProvider.cs" />
     <Compile Include="Provider\ContentProvider.cs" />
     <Compile Include="Engine\World.cs" />
@@ -71,6 +82,7 @@
     <Compile Include="Util\GObservableCollection.cs" />
     <Compile Include="Util\IDGenerator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Util\Prerequisite.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Content\names.csv">

@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -88,7 +89,7 @@ namespace Glacier.Common.Provider.Input
 
         Keys[] pressedKeys = new Keys[0];
         Point oldMousePosition;
-        Dictionary<IClickable, TransformGroup> subscribers = new Dictionary<IClickable, TransformGroup>(); 
+        Dictionary<IClickable, TransformGroup> subscribers = new Dictionary<IClickable, TransformGroup>();
 
         public void Listen()
         {
@@ -104,7 +105,8 @@ namespace Glacier.Common.Provider.Input
                 MouseLeftDown = false;
                 left = true;
             }
-            if (mState.RightButton == ButtonState.Pressed) { 
+            if (mState.RightButton == ButtonState.Pressed)
+            {
                 MouseRightDown = true;
             }
             else if (MouseRightDown)
@@ -116,8 +118,8 @@ namespace Glacier.Common.Provider.Input
             var nowPressed = kState.GetPressedKeys();
             foreach (var key in nowPressed)
                 if (!pressedKeys.Contains(key))
-                    finalizekeys.Add(key);            
-            pressedKeys = nowPressed.ToArray(); 
+                    finalizekeys.Add(key);
+            pressedKeys = nowPressed.ToArray();
             MouseMoved = oldMousePosition != GameResources.MouseWorldPosition;
             CurrentArgs = new InputEventArgs()
             {
@@ -126,7 +128,7 @@ namespace Glacier.Common.Provider.Input
                 MouseRightClick = right,
                 Position = Mouse.GetState().Position,
                 MouseMoved = MouseMoved
-            };                     
+            };
             oldMousePosition = GameResources.MouseWorldPosition;
         }
 
@@ -155,20 +157,26 @@ namespace Glacier.Common.Provider.Input
             var MouseState = Mouse.GetState();
             var results = new List<T>();
             bool singularCheck = true;
+            var count = 0;
             foreach (var tupleObj in CheckThrough.Reverse())
             {
+                if (tupleObj.Key.Destroyed)
+                {
+                    Unsubscribe(tupleObj.Key);
+                    count++;
+                }
                 if (!tupleObj.Key.Enabled) { tupleObj.Key.IsMouseOver = false; continue; }
                 var mousePos = MouseState.Position;
                 if (tupleObj.Value == TransformGroup.World)
                     mousePos = GameResources.MouseWorldPosition;
-                var MouseRect = new Rectangle(mousePos, new Point(1, 1));                
+                var MouseRect = new Rectangle(mousePos, new Point(1, 1));
                 var x = tupleObj.Key;
                 var oldMouseOver = x.IsMouseOver;
                 if (x.Hitbox.Intersects(MouseRect) && (singularCheck ? !results.Any() : true)) //Per-Pixel detection (fast)
                 {
                     if (x.Texture != null && x.PerpixelHitDetection)
                     {
-                        var pt = (mousePos - x.Hitbox.Location).ToVector2();
+                        var pt = (mousePos - x.Hitbox.Location).ToVector2() + x.Safezone.Location.ToVector2();
                         if (x.Scale != 1)
                             pt /= new Vector2((float)x.Scale);
                         var data = new Color[1];
@@ -183,7 +191,7 @@ namespace Glacier.Common.Provider.Input
                         results.Add(x);
                         if (oldMouseOver != x.IsMouseOver)
                             x.MouseEnter(time, CurrentArgs);
-                        if (CurrentArgs.MouseLeftClick || CurrentArgs.MouseRightClick)
+                        if (CurrentArgs.MouseLeftClick)// || CurrentArgs.MouseRightClick)
                             x.Clicked(time, CurrentArgs);
                         if (MouseState.LeftButton == ButtonState.Pressed || MouseState.RightButton == ButtonState.Pressed)
                             x.MouseDown(time, CurrentArgs);
@@ -196,6 +204,8 @@ namespace Glacier.Common.Provider.Input
                         x.MouseLeave(time, CurrentArgs);
                 }
             }
+            if (count > 0)
+                Debug.WriteLine("[GLACIER]: InputProvider cleaned " + count + " destroyed subscribers. (" + subscribers.Count + " subscribers)");
             Results = results;
             return results.FirstOrDefault();
         }
@@ -203,14 +213,15 @@ namespace Glacier.Common.Provider.Input
         public void Refresh(GameTime gt)
         {
             Listen();
-            CollisionCheck(gt, subscribers, out IEnumerable<IClickable> results);
-            if (!CurrentArgs.Handled)
-                CurrentArgs.Handled = results.Any();
             if (CurrentArgs.MouseLeftClick || CurrentArgs.MouseRightClick || CurrentArgs.PressedKeys.Any())
                 PreviewInputEvent?.Invoke(CurrentArgs);
+            CollisionCheck(gt, subscribers, out IEnumerable<IClickable> results);
+            if (!CurrentArgs.Handled)
+                CurrentArgs.Handled = results.Any();            
             if (CurrentArgs.MouseLeftClick || CurrentArgs.MouseRightClick || CurrentArgs.PressedKeys.Any())
                 InputEvent?.Invoke(CurrentArgs);
             _manualHandle = false;
         }
     }
 }
+

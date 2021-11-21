@@ -1,7 +1,9 @@
 ﻿using Glacier.Common.Util;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Media;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,8 +17,17 @@ namespace Glacier.Common.Provider
 {
     public sealed class ContentProvider : IProvider
     {
+        public enum GradientDirections
+        {
+            Horizontal,
+            Vertical,
+            HorizontalReverse,
+            VerticalReverse,
+        }        
         private ContentManager Manager;
-        private Dictionary<string, (Texture2D texture, Rectangle? safezone)> textureCache = new Dictionary<string, (Texture2D, Rectangle?)>();
+        private Dictionary<string, SoundEffect> soundCache = new Dictionary<string, SoundEffect>();
+        private Dictionary<string, (Texture2D texture, Rectangle? safezone)> textureCache = new Dictionary<string, (Texture2D, Rectangle?)>();        
+
         public ProviderManager Parent { get; set; }
 
         public ContentProvider(ContentManager manager)
@@ -41,7 +52,7 @@ namespace Glacier.Common.Provider
         }
         public Rectangle? GetTextureSafezone(Texture2D key, bool refreshSafezone = false)
         {
-            if (key == null) return null;
+            if (key == null || key.Name == null) return null;
             return GetTextureSafezone(key.Name, refreshSafezone);
             /*
             var dicKey = textureCache.FirstOrDefault(x => key == x.Value.texture);
@@ -99,6 +110,8 @@ namespace Glacier.Common.Provider
         public Texture2D Add(string name, Texture2D texture)
         {
             texture.Name = name;
+            if (textureCache.ContainsKey(name))
+                DestroyTexture(name);
             textureCache.Add(name, (texture, Crop(texture)));
             return texture;
         }
@@ -114,6 +127,30 @@ namespace Glacier.Common.Provider
             return amount;
         }
 #endif
+
+        public bool DestroyTexture(string Name)
+        {
+            if (!textureCache.ContainsKey(Name))
+                return false;
+            var texture = textureCache[Name];
+            texture.texture.Dispose();
+            textureCache.Remove(Name);
+            return true;
+        }
+
+        public SoundEffect GetSoundEffect(string key)
+        {
+            if (soundCache.ContainsKey(key))
+                return soundCache[key];
+
+            var sound = GetContent<SoundEffect>(key);
+            soundCache.Add(key, sound);
+            return sound;
+        }
+        public Song GetSong(string key)
+        {
+            return GetContent<Song>(key);
+        }
 
         public Texture2D GetTexture(string key)
         {
@@ -133,6 +170,7 @@ namespace Glacier.Common.Provider
                 }
                 catch (Exception)
                 {
+                    Debug.WriteLine("[GLACIER]: Content was not found: " + key);
                     return null;
                 }
         }
@@ -151,6 +189,63 @@ namespace Glacier.Common.Provider
         public void Refresh(GameTime time)
         {
             ;
+        }
+
+        /// <summary>
+        /// Generates a gradient texture using the two supplied colors, filling the Size, 
+        /// in the given direction, storing the texture reference with the Name.
+        /// </summary>
+        /// <param name="Name"></param>
+        /// <param name="color1"></param>
+        /// <param name="color2"></param>
+        /// <param name="Size"></param>
+        public Texture2D GenerateGradient(string Name, Color color1, Color color2, Rectangle Size, GradientDirections GradientDirection)
+        {
+            if (textureCache.TryGetValue(Name, out var tuple))
+                return tuple.texture;
+            Texture2D newAllocTex = new Texture2D(GameResources.Device, Size.Width, Size.Height);
+            Color[] sourceTexture = new Color[Size.Width * Size.Height];
+            if (GradientDirection == GradientDirections.HorizontalReverse || GradientDirection == GradientDirections.VerticalReverse)
+            {
+                if (GradientDirection == GradientDirections.HorizontalReverse)
+                    GradientDirection = GradientDirections.Horizontal;
+                else GradientDirection = GradientDirections.Vertical;
+                var foo = color1;
+                color1 = color2;
+                color2 = foo;
+            }
+            switch (GradientDirection)
+            {
+                case GradientDirections.Horizontal:
+                    {
+                        for (int x = 0; x < Size.Width; x++)
+                        {
+                            for (int y = 0; y < Size.Height; y++)
+                            {
+                                float amount = (float)x / Size.Width;
+                                Color setColor = Color.Lerp(color1, color2, amount);
+                                sourceTexture[y * Size.Width + x] = setColor;
+                            }
+                        }
+                    }
+                    break;
+                case GradientDirections.Vertical:
+                    {
+                        for (int y = 0; y < Size.Height; y++)                            
+                        {
+                            for (int x = 0; x < Size.Width; x++)
+                            {
+                                float amount = (float)y / Size.Height;
+                                Color setColor = Color.Lerp(color1, color2, amount);
+                                sourceTexture[y * Size.Width + x] = setColor;
+                            }
+                        }
+                    }
+                    break;
+            }                    
+            newAllocTex.SetData(sourceTexture);
+            Add(Name, newAllocTex);
+            return newAllocTex;
         }
     }
 }

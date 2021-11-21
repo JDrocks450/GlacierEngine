@@ -65,7 +65,7 @@ namespace Glacier.Common.Provider
         {
             get => StartColor; set => StartColor = value;
         }
-        private Color StartColor;
+        private Color StartColor = Color.White;
         public ZoomFadeModes ZoomFadeMode
         {
             get;set;
@@ -140,7 +140,7 @@ namespace Glacier.Common.Provider
 
         public override void Initialize()
         {
-            Origin = new Vector2(.5f);
+            OriginRatio = new Vector2(.5f);
             Expired = false;
             Play();
             base.Color = Color;

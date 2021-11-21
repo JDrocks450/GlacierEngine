@@ -9,6 +9,13 @@ using System.Threading.Tasks;
 
 namespace Glacier.Common.Provider
 {
+    public enum HeadlineAnimation
+    {
+        None,
+        Float,
+        FadeOut,        
+    }
+
     public interface IHeadlineable
     {
         Vector2 Position
@@ -35,6 +42,10 @@ namespace Glacier.Common.Provider
         {
             get; set;
         } = TimeSpan.FromSeconds(2.5);
+        public HeadlineAnimation Animation
+        {
+            get; set;
+        } = HeadlineAnimation.FadeOut | HeadlineAnimation.Float;
         public HeadlineDefinition(string Name, Texture2D texture)
         {
             Texture = texture;
@@ -42,28 +53,47 @@ namespace Glacier.Common.Provider
         }
     }
 
-    internal class Headline : GameObject
+    public class Headline : GameObject
     {
+        const float MAX_HEADLINE_FLOAT_HEIGHT = 50f;
         public IHeadlineable Parent
         {
-            get; set;
+            get; internal set;
         }
         public string Name => Definiton.Name;
         private HeadlineDefinition Definiton;
+        private TimeSpan _shownTime;
+        private float YOffset = 0, animOpacity = 1;
+
         public TimeSpan TimeSinceAppeared
         {
             get; private set;
-        }        
-        internal Headline(HeadlineDefinition definition) : base(default(Texture2D), new Vector2(), new Point())
+        }
+        public TimeSpan ShownTime
         {
-            
+            get
+            {
+                return _shownTime;
+            }
+            set
+            {
+                _shownTime = value;
+            }
+        }
+        protected override bool AutoInitialize => false;
+        internal Headline(HeadlineDefinition definition, IHeadlineable Subject) : base(default(Texture2D), new Vector2(), new Point())
+        {
+            Definiton = definition;
+            _shownTime = Definiton.ShownTime;
+            Parent = Subject;
+            Initialize();
         }
 
         public override void Initialize()
         {
             Texture = Definiton.Texture;
             Size = new Point(50);
-            Visible = true;
+            Visible = true;            
         }
 
         public override void Update(GameTime gt)
@@ -71,7 +101,13 @@ namespace Glacier.Common.Provider
             if (Visible)
             {
                 TimeSinceAppeared += gt.ElapsedGameTime;
-                Position = Parent.Position + ((Parent.Size / new Point(2)) - new Point(25)).ToVector2(); //centered above IHeadlinable
+                float percentComplete = (float)((TimeSinceAppeared - TimeSpan.FromSeconds(ShownTime.TotalSeconds / 2)).TotalSeconds / ShownTime.TotalSeconds);
+                if (Definiton.Animation.HasFlag(HeadlineAnimation.Float))
+                    YOffset = MathHelper.SmoothStep(0, MAX_HEADLINE_FLOAT_HEIGHT, percentComplete);
+                if (Definiton.Animation.HasFlag(HeadlineAnimation.FadeOut))
+                    animOpacity = MathHelper.SmoothStep(1, 0, percentComplete);
+                Opacity = animOpacity;
+                Position = Parent.Position /*+ ((Parent.Size.ToVector2() * new Vector2(.5f,0)))*/ - new Vector2(0,Texture.Height) - new Vector2(0, YOffset); //centered above IHeadlinable
                 if (TimeSinceAppeared > Definiton.ShownTime)
                     Visible = false;
             }
@@ -116,19 +152,28 @@ namespace Glacier.Common.Provider
             return null;
         }
 
-        public bool AddHeadline(IHeadlineable Subject, string HeadlineKey)
+        public Headline AddHeadline(IHeadlineable Subject, string HeadlineKey)
         {
             var definition = GetDefinition(HeadlineKey);
             if (definition == null)
-                return false;
-            AddHeadline(Subject, definition);
-            return true;
+                return null;
+            return AddHeadline(Subject, definition);
         }
 
-        public void AddHeadline(IHeadlineable Subject, HeadlineDefinition Headline)
+        public Headline AddHeadline(IHeadlineable Subject, HeadlineDefinition Headline)
         {
-            Headline headLine = new Headline(Headline);
+            if (HasHeadline(Subject))
+                RemoveHeadline(Subject);
+            Headline headLine = new Headline(Headline, Subject);
             Headlines.Add(Subject, headLine);
+            return headLine;
+        }
+
+        public bool HasHeadline(IHeadlineable Subject) => Headlines.ContainsKey(Subject);
+
+        public bool RemoveHeadline(IHeadlineable Subject)
+        {
+            return Headlines.Remove(Subject);
         }
 
         public void Refresh(GameTime gt)

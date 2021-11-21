@@ -42,7 +42,7 @@ namespace Glacier.Common.Engine
         /// <param name="Object">The object this shadow is being applied to</param>
         public Shadow(string ShadowName, GameObject Object) : this(GameResources.GetTexture("Shadows/" + ShadowName), Object)
         {
-
+            
         }
 
         public void DrawShadow(SpriteBatch batch)
